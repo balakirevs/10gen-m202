@@ -1,0 +1,10 @@
+H-w 1.2 answer: 11:
+  
+  > use m202
+  > db.answers.insert({'homework':'homework_1.2', 'answer':11});
+
+H-w 1.4 answers:
+
+  -	The server is under heavy write load
+  - Queries accessed data not in memory starting shortly before 12:30
+
