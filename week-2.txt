@@ -3,10 +3,14 @@ H-w 2.1:
   - Documents are often accessed in natural order sequentially
   - You are using a spinning disk, rather than an SSD
 
+===========================================================================================================  
+
 H-w 2.2:
   
   - Scenario 1: RA = 16 or 32
   - Scenario 2: RA = 1024
+
+=============================================================================================================  
 
 H-w 2.3:
 
@@ -14,12 +18,51 @@ H-w 2.3:
   - Add an index for the variable(s) you are using to sort the documents
   - If possible, perform a $match before the $sort in order to reduce the number of
 
+==============================================================================================================  
+
 H-w 2.4:
   
+  Preparation, Importing DB, Checkup.
+
   mongod --dbpath
   mongo
-  use fragDB
-  db.repairDatabase()   
+  > show dbs
+    admin   (empty)
+    fragDB  0.453GB
+    local   0.078GB
+  > use fragDB
+    switched to db fragDB
+  > show collections
+    fragColl
+    system.indexes
+  > db.fragColl.stats().size
+    48000000
+  > db.fragColl.stats().storageSize
+    335900672
+  > db.runCommand({compact: 'fragColl'})
+    { "ok" : 1 }
+  > db.fragColl.stats().size
+    48000000
+  > db.fragColl.stats().storageSize
+    66904064
+  
+
+  Improvement of Storage Efficiency & reclaiming of disk space.
+
+  > (db.stats().dataSize + db.stats().indexSize) / db.stats().fileSize
+    0.11291854722159249
+  > (db.stats().dataSize + db.stats().indexSize)
+    53044848
+  > db.stats().fileSize
+    469762048
+  > db.repairDatabase()
+    { "ok" : 1 }
+  > (db.stats().dataSize + db.stats().indexSize)
+    53044848
+  > db.stats().fileSize
+    201326592   
+
+==============================================================================================================      
   
 H-w 2.5:
   
