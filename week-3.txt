@@ -1,0 +1,262 @@
+H-w 3.1:
+  
+Primary:
+mongod --port 30001 --dbpath mongod-pri --replSet CorruptionTest --smallfiles --oplogSize 128
+Secondary
+mongod --port 30002 --dbpath mongod-sec --replSet CorruptionTest --smallfiles --oplogSize 128
+Arbiter
+mongod --port 30003 --dbpath mongod-arb --replSet CorruptionTest
+
+- After starting it you can login to any of the RS node shell for checking which is P/S/A: 
+> mongo --port 30002
+
+MongoDB shell version: 2.6.1
+connecting to: 127.0.0.1:30002/test
+CorruptionTest:SECONDARY> 
+CorruptionTest:SECONDARY> 
+CorruptionTest:SECONDARY> rs.status()
+{
+	"set" : "CorruptionTest",
+	"date" : ISODate("2014-05-16T16:54:40Z"),
+	"myState" : 2,
+	"syncingTo" : "127.0.0.1:30001",
+	"members" : [
+		{
+			"_id" : 0,
+			"name" : "127.0.0.1:30001",
+			"health" : 1,
+			"state" : 1,
+			"stateStr" : "PRIMARY",
+			"uptime" : 229,
+			"optime" : Timestamp(1399499925, 7077),
+			"optimeDate" : ISODate("2014-05-07T21:58:45Z"),
+			"lastHeartbeat" : ISODate("2014-05-16T16:54:39Z"),
+			"lastHeartbeatRecv" : ISODate("2014-05-16T16:54:40Z"),
+			"pingMs" : 0,
+			"electionTime" : Timestamp(1400259057, 1),
+			"electionDate" : ISODate("2014-05-16T16:50:57Z")
+		},
+		{
+			"_id" : 1,
+			"name" : "127.0.0.1:30002",
+			"health" : 1,
+			"state" : 2,
+			"stateStr" : "SECONDARY",
+			"uptime" : 246,
+			"optime" : Timestamp(1399499925, 7077),
+			"optimeDate" : ISODate("2014-05-07T21:58:45Z"),
+			"self" : true
+		},
+		{
+			"_id" : 2,
+			"name" : "127.0.0.1:30003",
+			"health" : 1,
+			"state" : 7,
+			"stateStr" : "ARBITER",
+			"uptime" : 167,
+			"lastHeartbeat" : ISODate("2014-05-16T16:54:39Z"),
+			"lastHeartbeatRecv" : ISODate("2014-05-16T16:54:39Z"),
+			"pingMs" : 0
+		}
+	],
+	"ok" : 1
+}
+CorruptionTest:SECONDARY> show collections
+2014-05-16T22:26:02.930+0530 error: { "$err" : "not master and slaveOk=false", "code" : 13435 } at src/mongo/shell/query.js:131
+CorruptionTest:SECONDARY> show dbs
+admin   (empty)
+local   0.281GB
+test    (empty)
+testDB  0.125GB
+CorruptionTest:SECONDARY> use testDB
+switched to db testDB
+CorruptionTest:SECONDARY> show collections
+2014-05-16T22:26:20.831+0530 error: { "$err" : "not master and slaveOk=false", "code" : 13435 } at src/mongo/shell/query.js:131
+CorruptionTest:SECONDARY> rs.slaveOk()
+CorruptionTest:SECONDARY> show collections
+system.indexes
+testColl
+CorruptionTest:SECONDARY> db.testColl.findOne()
+{
+	"_id" : 0,
+	"string" : "testStringForPadding0000000000000000000000000000000000000000",
+	"otherID" : ObjectId("536aac8ef7f5f8e9b4c240ea")
+}
+CorruptionTest:SECONDARY> db.testColl.find().explain()
+2014-05-16T22:27:21.961+0530 error: {
+	"$err" : "BSONObj size: 1685417573 (0x64756E65) is invalid. Size must be between 0 and 16793600(16MB) First element: //drrdu/dvad\u0002string: ?type=111",
+	"code" : 10334
+} at src/mongo/shell/query.js:131
+
+Is shows some error.
+
+- So, now I've stopped the DB using the following command in secondary shell:
+CorruptionTest:SECONDARY> db.shutdownServer()
+shutdown command only works with the admin database; try 'use admin'
+CorruptionTest:SECONDARY> use admin
+switched to db admin
+CorruptionTest:SECONDARY> db.shutdownServer()
+2014-05-16T22:35:21.659+0530 DBClientCursor::init call() failed
+server should be down...
+2014-05-16T22:35:21.662+0530 trying reconnect to 127.0.0.1:30002 (127.0.0.1) failed
+2014-05-16T22:35:21.663+0530 warning: Failed to connect to 127.0.0.1:30002, reason: errno:111 Connection refused
+2014-05-16T22:35:21.663+0530 reconnect 127.0.0.1:30002 (127.0.0.1) failed failed couldn't connect to server 127.0.0.1:30002 (127.0.0.1), connection attempt failed
+2014-05-16T22:35:21.779+0530 trying reconnect to 127.0.0.1:30002 (127.0.0.1) failed
+2014-05-16T22:35:21.779+0530 warning: Failed to connect to 127.0.0.1:30002, reason: errno:111 Connection refused
+2014-05-16T22:35:21.779+0530 reconnect 127.0.0.1:30002 (127.0.0.1) failed failed couldn't connect to server 127.0.0.1:30002 (127.0.0.1), connection attempt failed
+
+- Now I'm out of the shell, as the mongod is stopped. 
+- I've deleted all the files which are under the mongod-sec:
+ravitezu@terminator:~/Downloads$ cd mongod-sec/
+ravitezu@terminator:~/Downloads/mongod-sec$ ls
+journal  local.0  local.1  local.ns  mongod.lock  testDB.0  testDB.1  testDB.2  testDB.ns
+ravitezu@terminator:~/Downloads/mongod-sec$ rm -rf *
+
+- And started the host with the below command(as above):
+ravitezu@terminator:~/Downloads$ mongod --port 30002 --dbpath mongod-sec --replSet CorruptionTest --smallfiles --oplogSize 128
+
+- From above logs: It has recovered, it means it has pulled the data from Primary node. 
+- Use the MongProc.
+
+=============================================================================================================== 
+
+H-w 3.2:
+  
+  - Before Friday
+
+As every node can handle a total of 20,000 connections, but only 90% of 20,000 connections are allowed. 
+So, each node should only be used for 18,000 connections.  
+
+===============================================================================================================  
+
+H-w 3.3:
+ 
+ - The application will still be able to read data.
+ - The primary in DC2 will step itself down when the partition occurs.
+ - The two secondaries will hold an election when the partition occurs.
+ - The application will still be able to write while the partition is up.
+
+=============================================================================================================== 
+
+H-w 3.4:
+
+  - The db.collection.drop() command will still be in the oplog, and will need to be avoided.
+  - Ensure that any writes that occurred after the drop() command are not replayed (you might need to deal with these later), because these might lead to unexpected or inconsistent results.
+
+===============================================================================================================  
+
+H-w 3.5:
+
+  - mongod --config mongod.conf -> This starts a mongod replica instance with the backuptest as db path and on port 30001.
+
+ - Now connect to it and get the offend operation timestamp: 
+  
+➜  homework_3_5  mongo --port 30001
+MongoDB shell version: 2.6.1
+connecting to: 127.0.0.1:30001/test
+Server has startup warnings: 
+2014-05-18T13:34:56.227+0200 [initandlisten] 
+2014-05-18T13:34:56.227+0200 [initandlisten] ** NOTE: This is a 32 bit MongoDB binary.
+2014-05-18T13:34:56.227+0200 [initandlisten] **       32 bit builds are limited to less than 2GB of data (or less with --journal).
+2014-05-18T13:34:56.227+0200 [initandlisten] **       Note that journaling defaults to off for 32 bit and is currently off.
+2014-05-18T13:34:56.227+0200 [initandlisten] **       See http://dochub.mongodb.org/core/32bit
+2014-05-18T13:34:56.227+0200 [initandlisten] 
+BackupTest:PRIMARY> show dbs
+admin     (empty)
+backupDB  0.250GB
+local     0.281GB
+BackupTest:PRIMARY> use local
+switched to db local
+BackupTest:PRIMARY> show collections
+me
+oplog.rs
+startup_log
+system.indexes
+system.replset
+BackupTest:PRIMARY> db.oplog.rs.find({"op":"c"})
+{ "ts" : Timestamp(1398778745, 1), "h" : NumberLong("-4262957146204779874"), "v" : 2, "op" : "c", "ns" : "backupDB.$cmd", "o" : { "drop" : "backupColl" } }
+
+The ts is 1398778745:1
+
+➜  homework_3_5  mongodump --port 30001 -d local -c oplog.rs -o oplogD
+connected to: 127.0.0.1:30001
+2014-05-18T13:37:30.556+0200 DATABASE: local	 to 	oplogD/local
+2014-05-18T13:37:30.585+0200 	local.oplog.rs to oplogD/local/oplog.rs.bson
+2014-05-18T13:37:31.942+0200 		 701202 documents
+2014-05-18T13:37:31.942+0200 	Metadata for local.oplog.rs to oplogD/local/oplog.rs.metadata.json
+➜  homework_3_5  mkdir oplogR
+➜  homework_3_5  mv oplogD/local/oplog.rs.bson oplogR/oplog.bson
+
+- Now start a new standalone(not replicaset) and do a mongorestore.
+
+➜  homework_3_5  mongorestore --journal backupDB
+connected to: 127.0.0.1
+2014-05-18T13:41:47.599+0200 backupDB/backupColl.bson
+2014-05-18T13:41:47.599+0200 	going into namespace [backupDB.backupColl]
+2014-05-18T13:41:50.242+0200 		Progress: 6988800/55036800	12%	(bytes)
+2014-05-18T13:41:53.036+0200 		Progress: 12448800/55036800	22%	(bytes)
+2014-05-18T13:41:56.468+0200 		Progress: 19046300/55036800	34%	(bytes)
+2014-05-18T13:41:59.304+0200 		Progress: 24497200/55036800	44%	(bytes)
+2014-05-18T13:42:02.006+0200 		Progress: 29875300/55036800	54%	(bytes)
+2014-05-18T13:42:05.160+0200 		Progress: 34871200/55036800	63%	(bytes)
+2014-05-18T13:42:08.003+0200 		Progress: 40404000/55036800	73%	(bytes)
+2014-05-18T13:42:11.515+0200 		Progress: 47065200/55036800	85%	(bytes)
+2014-05-18T13:42:14.014+0200 		Progress: 51706200/55036800	93%	(bytes)
+604800 objects found
+2014-05-18T13:42:15.729+0200 	Creating index: { key: { _id: 1 }, name: "_id_", ns: "backupDB.backupColl" }
+
+Then, replay the oplog on this standalone node: mongorestore --oplogReplay --oplogLimit 1398778745:1 oplogR
+
+➜  homework_3_5  mongorestore --oplogReplay --oplogLimit 1398778745:1 oplogR
+connected to: 127.0.0.1
+2014-05-18T13:42:37.118+0200 	 Replaying oplog
+2014-05-18T13:42:40.014+0200 		Progress: 2371319/113990182	2%	(bytes)
+2014-05-18T13:42:43.018+0200 		Progress: 4826219/113990182	4%	(bytes)
+2014-05-18T13:42:46.016+0200 		Progress: 7281119/113990182	6%	(bytes)
+2014-05-18T13:42:49.015+0200 		Progress: 9786119/113990182	8%	(bytes)
+2014-05-18T13:42:52.007+0200 		Progress: 12224319/113990182	10%	(bytes)
+2014-05-18T13:42:55.016+0200 		Progress: 14679219/113990182	12%	(bytes)
+2014-05-18T13:42:58.019+0200 		Progress: 17150819/113990182	15%	(bytes)
+2014-05-18T13:43:01.021+0200 		Progress: 19622419/113990182	17%	(bytes)
+2014-05-18T13:43:04.023+0200 		Progress: 22094019/113990182	19%	(bytes)
+2014-05-18T13:43:07.011+0200 		Progress: 24548919/113990182	21%	(bytes)
+2014-05-18T13:43:10.015+0200 		Progress: 27053919/113990182	23%	(bytes)
+2014-05-18T13:43:13.024+0200 		Progress: 29558919/113990182	25%	(bytes)
+2014-05-18T13:43:16.026+0200 		Progress: 32063919/113990182	28%	(bytes)
+2014-05-18T13:43:19.015+0200 		Progress: 34518819/113990182	30%	(bytes)
+2014-05-18T13:43:22.013+0200 		Progress: 37157419/113990182	32%	(bytes)
+2014-05-18T13:43:25.009+0200 		Progress: 39729219/113990182	34%	(bytes)
+2014-05-18T13:43:28.016+0200 		Progress: 42367819/113990182	37%	(bytes)
+2014-05-18T13:43:31.014+0200 		Progress: 45190119/113990182	39%	(bytes)
+2014-05-18T13:43:34.024+0200 		Progress: 47711819/113990182	41%	(bytes)
+2014-05-18T13:43:37.020+0200 		Progress: 50266919/113990182	44%	(bytes)
+2014-05-18T13:43:40.023+0200 		Progress: 52838719/113990182	46%	(bytes)
+2014-05-18T13:43:43.017+0200 		Progress: 55560819/113990182	48%	(bytes)
+2014-05-18T13:43:46.020+0200 		Progress: 58032419/113990182	50%	(bytes)
+2014-05-18T13:43:49.021+0200 		Progress: 60537419/113990182	53%	(bytes)
+2014-05-18T13:43:52.019+0200 		Progress: 63059119/113990182	55%	(bytes)
+2014-05-18T13:43:55.009+0200 		Progress: 65547419/113990182	57%	(bytes)
+2014-05-18T13:43:58.019+0200 		Progress: 68186019/113990182	59%	(bytes)
+2014-05-18T13:44:01.022+0200 		Progress: 70774519/113990182	62%	(bytes)
+2014-05-18T13:44:04.007+0200 		Progress: 73262819/113990182	64%	(bytes)
+2014-05-18T13:44:07.024+0200 		Progress: 75801219/113990182	66%	(bytes)
+2014-05-18T13:44:10.017+0200 		Progress: 78473219/113990182	68%	(bytes)
+2014-05-18T13:44:13.024+0200 		Progress: 81078419/113990182	71%	(bytes)
+2014-05-18T13:44:16.014+0200 		Progress: 83633519/113990182	73%	(bytes)
+2014-05-18T13:44:19.024+0200 		Progress: 86171919/113990182	75%	(bytes)
+2014-05-18T13:44:22.012+0200 		Progress: 88643519/113990182	77%	(bytes)
+2014-05-18T13:44:25.017+0200 		Progress: 91115119/113990182	79%	(bytes)
+2014-05-18T13:44:28.009+0200 		Progress: 93620119/113990182	82%	(bytes)
+2014-05-18T13:44:31.014+0200 		Progress: 96125119/113990182	84%	(bytes)
+2014-05-18T13:44:34.010+0200 		Progress: 98713619/113990182	86%	(bytes)
+2014-05-18T13:44:37.012+0200 		Progress: 101171855/113990182	88%	(bytes)
+2014-05-18T13:44:40.010+0200 		Progress: 103228555/113990182	90%	(bytes)
+2014-05-18T13:44:43.017+0200 		Progress: 105219755/113990182	92%	(bytes)
+2014-05-18T13:44:46.021+0200 		Progress: 107237155/113990182	94%	(bytes)
+2014-05-18T13:44:49.024+0200 		Progress: 109280755/113990182	95%	(bytes)
+2014-05-18T13:44:52.009+0200 		Progress: 111298155/113990182	97%	(bytes)
+2014-05-18T13:44:55.011+0200 		Progress: 113589119/113990182	99%	(bytes)
+701202 objects found
+2014-05-18T13:44:55.489+0200 Applied 701200 oplog entries out of 701201 (1 skipped).
+
+Finally, run the MongoProc against this node or make this standalone run on 30001 as the MongoProc checks on this port for validating your answer. 
