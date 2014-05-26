@@ -1,0 +1,105 @@
+H-w 4-1:
+
+Answer:
+
+Formula of max. number of mongos connections = maxPrimaryConnections - (numSecondarynodesinaRS * 3) - (numOtherconnections *3) / numMongos
+maxPrimaryConnections - are limited by ulimit, memory, caps.
+
+- Max. Primary Connections = 10,000 (From 10GB the limit here is memory)
+- Num. of Secondaries in ReplicaSet = 2 (As each shard is a 3-node ReplicaSet)
+- Num. of Other connections = 6 (From question)
+- Num. of mongos hosts = 64 (From question)
+
+Max. mongos Connections = (10,000 - (2*3) - (6*3))/64 = 9976/64 = 155.875
+
+- As we have to use 90% of these: 155.875*0.9 = 140.2875 
+
+- Rounding: *140*
+
+
+===============================================================================================================
+
+H-w 4-2:
+
+Answer: 
+
+- You can make use of week-3 - 3.1 mongod-{pri,sec,arb} db directories for setting up a RS. 
+Primary:
+mongod --port 30001 --dbpath mongod-pri --replSet CorruptionTest --smallfiles --oplogSize 128
+Secondary
+mongod --port 30002 --dbpath mongod-sec --replSet CorruptionTest --smallfiles --oplogSize 128
+Arbiter
+mongod --port 30003 --dbpath mongod-arb --replSet CorruptionTest
+
+- Loging to PRIMARY SHELL and drop the testColl collection:
+  > mongo --port 30001 
+  > use testDB > db.testColl.drop() or you can delete all the docs in the collection.
+
+- Insert some doc to the same colletion with "a field in the docs": 
+  db.testColl.insert({"a":"Aleksandr"})
+  db.testColl.insert({"a":"Balakiriev"})
+  db.testColl.insert({"a":"Balakirevs"})
+  db.testColl.insert({"a":"Abv"})
+
+- As you've 3 nodes(P,S & A), now takedown the SECONDARY node(Make sure you have the above 4 docs in the testDB.testColl). 
+  mongo --port 30002 
+  > use admin 
+  > db.shutdownServer(). 
+
+- Start the secondary in standalone mode: 
+   mongod --port 30002 --dbpath mongod-sec
+
+- Connect to this standalone node(which is running on 30002) and create a index on the "a" field: 
+  mongo --port 30002 
+  > use testDB 
+  > db.testColl.ensureIndex({"a":1})
+
+- Shutdown this standalone node and add it back to ReplicaSet: 
+  use admin 
+  > db.shutdownServer()
+
+- Adding back to RS: mongod --port 30002 --dbpath mongod-sec --replSet CorruptionTest --smallfiles --oplogSize 128
+
+- Done, Make sure your MongoProc checks on 30001 port
+
+==============================================================================================================
+
+
+H-w 4.3:
+
+Answer: 
+
+- set up a ReplicaSet like in H-w 3-1.
+
+- Login to PRIMARY and start inserting the data: for(var i = 0; i <= 1000000 ; i++){db.rollback.insert({"a" : i}); sleep(100);}
+
+- Break the replication: kill -SIGSTOP <PID of Mongod running on 30002>
+
+- Then kill -SIGINT <PID of Mongod running on 30001>; kill -SIGCONT <PID of Mongod running on 30002>
+
+- Above command will kill the PRIMARY and will allow the Secondary node to continue. So, the SECONDARY node running on 30002 will be promted as PRIMARY now and the write which have happend while the SECONDARY node was stopped should be rolled back when we add the PRIMARY node(which runs on 30001) back to the set and it will be added as a SECONDARY node. 
+
+- To add it back to the ReplicaSet:
+*Note:* MongoProc has some bug here and you need to mention the absolute pathname for --dbpath. 
+mongod --port 30001 --dbpath /home/user/Downloads/4_2/mongod-pri/mongod-pri --replSet CorruptionTest --smallfiles --oplogSize 128
+ 
+➜  ~  ls -lrt /home/user/Downloads/4_2/mongod-pri/mongod-pri
+total 458776
+-rw------- 1 user user  16777216 May  7 23:59 testDB.ns
+-rw------- 1 user user  67108864 May  7 23:59 testDB.2
+-rw------- 1 user user  33554432 May  7 23:59 testDB.1
+-rw------- 1 user user  16777216 May  7 23:59 testDB.0
+drwxr-xr-x 2 user user      4096 May  8 15:53 journal
+-rwxrwxr-x 1 user user         6 May 25 22:35 mongod.lock
+drwxrwxr-x 2 user user      4096 May 25 22:35 rollback
+-rw------- 1 user user  16777216 May 25 22:35 local.0
+-rw------- 1 user user  16777216 May 25 22:35 test.ns
+-rw------- 1 user user  16777216 May 25 22:35 test.0
+-rw------- 1 user user  16777216 May 25 22:35 local.ns
+-rw------- 1 user user 268435456 May 25 22:35 local.1
+
+
+- You can see the rollback directory here. which is nothing but the bsondump of the writes which had happened while the SECONDARY(which is not PRIMARY) is down. You can restore this dump using the mongorestore command. 
+
+
+
