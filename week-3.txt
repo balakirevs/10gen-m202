@@ -7,7 +7,7 @@ mongod --port 30002 --dbpath mongod-sec --replSet CorruptionTest --smallfiles --
 Arbiter
 mongod --port 30003 --dbpath mongod-arb --replSet CorruptionTest
 
-- After starting it you can login to any of the RS node shell for checking which is P/S/A: 
+- Checking which is P/S/A: 
 > mongo --port 30002
 
 MongoDB shell version: 2.6.1
@@ -90,7 +90,7 @@ CorruptionTest:SECONDARY> db.testColl.find().explain()
 
 Is shows some error.
 
-- So, now I've stopped the DB using the following command in secondary shell:
+- Stop the DB using the following command in secondary shell:
 CorruptionTest:SECONDARY> db.shutdownServer()
 shutdown command only works with the admin database; try 'use admin'
 CorruptionTest:SECONDARY> use admin
@@ -105,15 +105,15 @@ server should be down...
 2014-05-16T22:35:21.779+0530 warning: Failed to connect to 127.0.0.1:30002, reason: errno:111 Connection refused
 2014-05-16T22:35:21.779+0530 reconnect 127.0.0.1:30002 (127.0.0.1) failed failed couldn't connect to server 127.0.0.1:30002 (127.0.0.1), connection attempt failed
 
-- Now I'm out of the shell, as the mongod is stopped. 
-- I've deleted all the files which are under the mongod-sec:
-ravitezu@terminator:~/Downloads$ cd mongod-sec/
-ravitezu@terminator:~/Downloads/mongod-sec$ ls
+ 
+- Delete all the files which are under the mongod-sec:
+➜  ~ cd mongod-sec/
+➜  ~ ls
 journal  local.0  local.1  local.ns  mongod.lock  testDB.0  testDB.1  testDB.2  testDB.ns
 ravitezu@terminator:~/Downloads/mongod-sec$ rm -rf *
 
-- And started the host with the below command(as above):
-ravitezu@terminator:~/Downloads$ mongod --port 30002 --dbpath mongod-sec --replSet CorruptionTest --smallfiles --oplogSize 128
+- Start the host:
+➜  ~ mongod --port 30002 --dbpath mongod-sec --replSet CorruptionTest --smallfiles --oplogSize 128
 
 - From above logs: It has recovered, it means it has pulled the data from Primary node. 
 - Use the MongProc.
@@ -125,7 +125,7 @@ H-w 3.2:
   - Before Friday
 
 As every node can handle a total of 20,000 connections, but only 90% of 20,000 connections are allowed. 
-So, each node should only be used for 18,000 connections.  
+Each node should only be used for 18,000 connections.  
 
 ===============================================================================================================  
 
