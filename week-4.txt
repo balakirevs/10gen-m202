@@ -1,3 +1,61 @@
+FAULT TOLERANCE AND AVAILABILITY:
+
+Quizes:
+
+1. Which of the following are considered part of best practices when doing rolling maintenance on a replica set? Check all that apply.
+
+Perform maintenance on one secondary at a time.[T]
+Ensure your replica set has a minimum of three data-bearing secondaries.[2 Secondaries are recommended]
+Shut down a secondary and restart it without --replSet to perform maintenance.[T]
+Restart secondaries on a different port when performing maintenance.[T]
+None of the above. MongoDB does not recommend rolling maintenance.
+
+2. Suppose your application is making use of a cursor to read a large amount of data from a sharded cluster. The mongos your application is talking to goes down and the application connects to another mongos. Which of the following will occur?
+
+The new mongos will continue to use the same cursor seamlessly.
+The cursor will be lost and an exception will be raised.[T]
+The cursor will be reset, and the query will start over at the beginning of the result set when getmore is called next.
+The cursor will skip one getmore call, so some documents in the result set will be skipped.
+The cursor will behave as if it reached the end of the result set.
+
+3. Which of the following are types of connections you might find in a replica set? Check all that apply.
+
+Heartbeat connections between members
+Connections from secondaries to their sync source in order to tail the oplog.
+Connections from secondaries to their sync source to keep track of where they are in the oplog
+Administrative connections from drivers to all members
+Connections from clients reading from secondaries - All are True
+
+4. Suppose you have an application backed by a sharded cluster. Each shard is a three-node replica set in which all nodes are data bearing. Your application is at 80% utilization for the maximum number of connections. Which type of process is the bottleneck in this scenario?
+
+Mongos
+Config server
+Primary[T]
+Secondary
+Client
+
+5. In mongodb 2.6, what is the hard limit on the maximum number of connections that a server can have?
+
+10,000
+20,000
+30,000
+40,000
+There is no limit[T] - Prior to MongoDB 2.6, the upper limit for maxIncomingConnections for a mongod or mongos was 20,000. Starting with MongoDB 2.6, this is no longer the case. There is no longer an upper limit on what value you can choose as your maxIncomingConnections. http://docs.mongodb.org/manual/reference/configuration-options/#net.maxIncomingConnections
+
+Note: For calculating max. number of mongos connections = maxPrimaryConnections - (numSecondarynodesinaRS * 3) - (numOtherconnections *3) // numMongos
+maxPrimaryConnections - are limited by ulimit, memory, caps. 
+
+6. Which of the following are true of automatic rollback? Check all that apply.
+
+Automatic rollback occurs only if rollback is less than 300MB.[T]
+Manual intervention is always required to restore the data.[T]
+Rollback can't occur if w="majority".
+
+
+==============================================================================================================
+
+
+
 H-w 4-1:
 
 Answer:

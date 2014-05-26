@@ -1,3 +1,69 @@
+DISASTER RECOVERY AND BACKUP:
+==============================
+
+Quizes:
+
+1. In a year, what is the maximum number of days of downtime you can have and still claim >99% uptime? [3] - 4 days downtime would be 98.9% availability.
+
+2. What are the key criteria for deciding your disaster recovery requirements?
+Tolerance for data loss[T]
+Tolerance for downtime[T]
+Tolerance for reduced capacity[T]
+Tolerance for CPU-intensive queries
+Tolerance to iocane powder
+
+3. Which of the following systems might have a low tolerance for both data loss and downtime? 
+Cache in front of the system of record
+Data storage for a system that need only deliver information once a month
+Online ad servers[T]
+A system with several redundant servers and low concern for consistency
+A system using MongoDB only as an in-memory cache in front of a relational database
+
+4. What conclusions regarding downtime and data loss should we draw in considering 2-node replica sets vs. single node deployments in MongoDB? Check all that apply. 
+Chances for downtime are increased[T] - As they won't provide an HA and you have onemore node to go down. 
+Chances for downtime are decreased
+Chances for downtime are unaffected
+Chances for data loss are increased
+Chances for data loss are decreased[T]
+Chances for data loss are unaffected
+
+5. Which of the following systems might have a low tolerance for data loss, but a high tolerance for downtime? 
+The navigation system used by automobiles manufactured by Ford
+A courseware system used during the teaching day at an elementary school[T]
+The blogging system used by the London Times
+A retail banking transaction system
+Gmail
+
+6. If you have 5 data centers across which your sharded cluster is distributed, how many data centers will be without a config server? - 2
+
+7. With regard to backing up your data, which of the following questions should you take time to consider?
+Do I need to do backups?
+How quickly can I restore?[T]
+What complications are distributed systems introducing?[T]
+Is my test strategy catching errors in backups?[T]
+
+8. What impacts might a snapshot based backup strategy have on a live system? Check all that apply.
+Slower operations[T]
+You will have to shut your system down to do it
+Slower disk I/O[T]
+It's not free[T]
+There are no obvious impacts
+
+9. When is it appropriate to use mongodump for backup?
+For small data sets[T]
+For config servers[T]
+In large production systems - It may take long time for dumping and restoring. It will have significant impact on your system.
+
+10. True or False: You can prevent certain collections from being backed up in MMS? - True
+You need to install a seperate backup agent on your server for this to work. This agent is different from MMS agent. *UGH!* - MMS backup is *not free*. Two factor authentication is used for taking backups and the backup data will be stores on MMS hosts. 
+The pricing is based on the amount of space you use for backups.
+
+
+
+===============================================================================================================
+
+
+
 H-w 3.1:
   
 Primary:
