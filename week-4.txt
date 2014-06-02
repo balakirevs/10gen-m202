@@ -1,6 +1,6 @@
 FAULT TOLERANCE AND AVAILABILITY:
 
-Quizes:
+Quiz:
 
 1. Which of the following are considered part of best practices when doing rolling maintenance on a replica set? Check all that apply.
 
