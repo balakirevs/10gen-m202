@@ -1,6 +1,6 @@
 PERFORMANCE AND MONITORING:
 
-Quizes:
+Quiz:
 
 1. How many MMS monitoring agents should you run for a production system? 
   - More then 1 for redundancy. 
