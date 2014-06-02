@@ -52,13 +52,13 @@ Quiz:
 
 H-w 5-1:
 
-1. Start configdb server(s) using the following command:
+1. Start configdb server(s):
    mongod --configsvr --dbpath /data/configdb --port 27019
 
 2. Start a mongos instance:
    mongos --configdb HP:27019 --port 27099
 
-3. Start 3 mongod instances with the following commands:
+3. Start 3 mongod instances:
    mongod --port 27031 --dbpath=/data/db
    mongod --port 27032 --dbpath=/data/db1
    mongod --port 27033 --dbpath=/data/db2
@@ -66,7 +66,7 @@ H-w 5-1:
 4. You should have 4 mongo processes running on your machine. 
 
 5. Now we need to set the 3 mongod instaces(3 shards) as a cluster, go to the mongos shell:
-   mongos --port 27099
+   mongo --port 27099
    mongos> db.adminCommand({addShard: "HP:27031", "name":"shard0"})
    mongos> db.adminCommand({addShard: "HP:27032", "name":"shard1"})
    mongos> db.adminCommand({addShard: "HP:27033", "name":"shard2"}) 
