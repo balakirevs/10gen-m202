@@ -1,7 +1,6 @@
 SYSTEM SIZING AND TUNING:
-==========================
 
-Quizes:
+Quiz:
 
 http://docs.mongodb.org/manual/faq/storage/ - more on storage
 
