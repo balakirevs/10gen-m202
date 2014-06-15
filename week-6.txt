@@ -1,0 +1,414 @@
+Sharded Cluster Management, Part 2
+
+Quiz:
+
+1. When does the balancer kick in?
+  
+  A-D below represent four different sharded cluster scenarios. Assuming you are running MongoDB 2.2 or greater, in which of the following scenarios would you expect there to be at least one balancing round to adjust the distribution of chunks across the shards? A is not one of them, by the way, and Adam uses this as a springboard into a little diagnosis in the solution.
+
+  A = s1(8 chunks),  s2(5 chunks), s3(7 chunks)
+
+  B = s1(2 chunks), s2(3 chunks), s3(1 chunks), s4(2 chunks), s5(4 chunks) [T]
+
+  C = s1(47 chunks), s2(53 chunks)
+
+  D = s1(32 chunks), s2(26 chunks), s3(28 chunks), s4(37 chunks) [T] 
+
+2. Suppose the output below reflects a sharded cluster you are working with. Based on the lesson, which chunk will be selected for migration during the next balancing round?
+
+mongos> sh.status({verbose : 1})
+--- Sharding Status --- 
+sharding version: {
+  "_id" : 1,
+  "version" : 4,
+  "minCompatibleVersion" : 4,
+  "currentVersion" : 5,
+  "clusterId" : ObjectId("538b744619782a0df0966b77")
+}
+shards:
+  {  "_id" : "shard0000",  "host" : "localhost:30000" }
+  {  "_id" : "shard0001",  "host" : "localhost:30001" }
+  {  "_id" : "shard0002",  "host" : "localhost:30002" }
+  {  "_id" : "shard0003",  "host" : "localhost:30003" }
+databases:
+  {  "_id" : "admin",  "partitioned" : false,  "primary" : "config" }
+  {  "_id" : "myapp",  "partitioned" : true,  "primary" : "shard0001" }
+    myapp.users
+      shard key: { "email" : 1 }
+      chunks:
+        shard0000  6
+        shard0002  5
+        shard0003  6
+        shard0001  9
+      { "email" : { "$minKey" : 1 } } -->> { "email" : "aa" } on : shard0000 Timestamp(2, 0) 
+      { "email" : "aa" } -->> { "email" : "ab" } on : shard0002 Timestamp(3, 0) 
+      { "email" : "ab" } -->> { "email" : "ac" } on : shard0003 Timestamp(4, 0) 
+      { "email" : "ac" } -->> { "email" : "ad" } on : shard0000 Timestamp(5, 0) 
+      { "email" : "ad" } -->> { "email" : "ae" } on : shard0002 Timestamp(6, 0) 
+      { "email" : "ae" } -->> { "email" : "ba" } on : shard0003 Timestamp(7, 0) 
+      { "email" : "ba" } -->> { "email" : "bb" } on : shard0000 Timestamp(8, 0) 
+      { "email" : "bb" } -->> { "email" : "bc" } on : shard0001 Timestamp(9, 0) 
+      { "email" : "bc" } -->> { "email" : "bd" } on : shard0003 Timestamp(10, 0) 
+      { "email" : "bd" } -->> { "email" : "be" } on : shard0001 Timestamp(11, 0) 
+      { "email" : "be" } -->> { "email" : "ca" } on : shard0002 Timestamp(12, 0) 
+      { "email" : "ca" } -->> { "email" : "cb" } on : shard0003 Timestamp(13, 0) 
+      { "email" : "cb" } -->> { "email" : "cc" } on : shard0000 Timestamp(14, 0) 
+      { "email" : "cc" } -->> { "email" : "cd" } on : shard0002 Timestamp(15, 0) 
+      { "email" : "cd" } -->> { "email" : "ce" } on : shard0003 Timestamp(16, 0) 
+      { "email" : "ce" } -->> { "email" : "da" } on : shard0000 Timestamp(17, 0) 
+      { "email" : "da" } -->> { "email" : "db" } on : shard0002 Timestamp(18, 0) 
+      { "email" : "db" } -->> { "email" : "dc" } on : shard0003 Timestamp(19, 0) 
+      { "email" : "dc" } -->> { "email" : "dd" } on : shard0000 Timestamp(20, 0) 
+      { "email" : "dd" } -->> { "email" : "de" } on : shard0001 Timestamp(20, 1) 
+      { "email" : "de" } -->> { "email" : "ea" } on : shard0001 Timestamp(1, 41) 
+      { "email" : "ea" } -->> { "email" : "eb" } on : shard0001 Timestamp(1, 43) 
+      { "email" : "eb" } -->> { "email" : "ec" } on : shard0001 Timestamp(1, 45) 
+      { "email" : "ec" } -->> { "email" : "ed" } on : shard0001 Timestamp(1, 47) 
+      { "email" : "ed" } -->> { "email" : "ee" } on : shard0001 Timestamp(1, 49) 
+      { "email" : "ee" } -->> { "email" : { "$maxKey" : 1 } } on : shard0001 Timestamp(1, 50) 
+
+ -  { "email" : { "$minKey" : 1 } } -->> { "email" : "aa" } on : shard0000
+
+ -  { "email" : "aa" } -->> { "email" : "ab" } on : shard0002
+
+ -  { "email" : "bb" } -->> { "email" : "bc" } on : shard0001  [T]
+
+ -  { "email" : "db" } -->> { "email" : "dc" } on : shard0003
+
+ -  { "email" : "ee" } -->> { "email" : { "$maxKey" : 1 } } on : shard0001    
+
+
+3. Anatomy of a migration overview
+
+Get a little practice reading log information on chunk migrations. Spin up a sharded cluster using the shardingTest() helper. Shard a collection across this cluster and create 20 or more chunks. Then look at the config.changelog collection to see how the chunks were moved from one shard to another during balancing.
+
+As values for the "what" field for documents in this collection you will see, "moveChunk.start", "moveChunk.to", and "moveChunk.from". You will also see one other value for the "what" field related to moveChunk operations. What is that value? Please enter the value exactly as it appears in config.changelog documents. Include the double quotes surrounding the value in your answer.
+
+- "moveChunk.commit"
+
+4. Anatomy of a migration...deep dive
+   While a chunk is in flight, where are updates and inserts for documents in the chunk range routed?
+
+
+  - They are not routed, the mongos caches them until the chunk migration completes.
+
+  - They are routed to the shard the chunk is being migrated from. [T]
+
+  - They are routed to the shard the chunk is being migrated to.
+
+  - They are routed to both shards.
+
+  - They are not routed, clients receive an exception notifying them to retry once migration is complete.
+
+5. Tag-based sharding overview -- why use it?
+
+Adam mentions one use case for tag-based sharding. Are there others? Before we dive deeper into this topic it's valuable to consider other uses. Please take some time to consider and share your thoughts in the discussion forum.
+
+  Yes [T]
+  No
+
+6. Simple tag-based sharding example
+
+Spin up a sharded cluster with three shards. In a database called houses create collections named lannister, stark, and targaryen. Set up your cluster so that the collection representing each house is pinned to one of the shards.
+
+Here is one possible solution to the Game of Thrones problem we posed. Please note that we are passing a configuration document to ShardingTest. This will ensure the mongods are created using small files and without preallocating data files and journal files. It should eliminate problems with disk space that some students have reported when using ShardingTest.
+
+config = { d0 : { smallfiles : "", noprealloc : "", nopreallocj : ""}, d1 : { smallfiles : "", noprealloc : "", nopreallocj : "" }, d2 : { smallfiles : "", noprealloc : "", nopreallocj : ""}};
+cluster = new ShardingTest( { shards : config } );
+// shard db
+sh.enableSharding("houses");
+
+// shard collections
+sh.shardCollection("houses.stark", {dire_wolves_owned:1});
+sh.shardCollection("houses.lannister", {debt_owed:1});
+sh.shardCollection("houses.targaryen", {followers:1});
+
+// Insert sample data
+use houses;
+var bulk = db.stark.initializeUnorderedBulkOp();
+
+for (var i=0; i < 100000; i++) { bulk.insert({dire_wolves_owned: Math.random()}); }
+bulk.execute();
+bulk = db.lannister.initializeUnorderedBulkOp();
+for (var i=0; i < 100000; i++) { bulk.insert({debt_owed: Math.random()}); }
+bulk.execute();
+bulk = db.targaryen.initializeUnorderedBulkOp();
+for (var i=0; i < 100000; i++) { bulk.insert({followers: Math.random()}); }
+
+bulk.execute();
+
+sh.addShardTag("shard0000", "sta");
+sh.addShardTag("shard0001", "lan");
+sh.addShardTag("shard0002", "tar");
+
+sh.addTagRange("houses.stark", {dire_wolves_owned:MinKey}, {dire_wolves_owned:MaxKey}, "sta");
+sh.addTagRange("houses.lannister", {debt_owed:MinKey}, {debt_owed:MaxKey}, "lan");
+sh.addTagRange("houses.targaryen", {followers:MinKey}, {followers:MaxKey}, "tar");
+
+6. In which of the following scenarios would hash-based sharding be most likely to provide performance benefits?
+
+In write-heavy applications[T]
+In read-heavy applications
+In systems distributed across hardware with varying levels of performance
+If the common query patterns in an application select documents based on multiple fields
+
+7. Unbalanced chunks overview: Consider the diagram below depicting the distribution of chunks across a sharded cluster. For each chunk, the number (16, 32, or 64) defines the size of the chunk in MB. Assuming no new chunks are created, which of the following best describes what actions the balancer will take during the next balancing round? [See attached pic - unbalanced_chunks_quiz.png]
+
+The shards are balanced. There will not be a balancing round until more chunks are created.
+The balancer will migrate a chunk from shard 1 to shard 2.
+The balancer will migrate a chunk from shard 2 to shard 3.[T] - Total chunk are 13, migrations happen from more chunks shard to lower chunks shard, when there's a difference of more than 2 # of chunks.
+The balancer will migrate a chunk from shard 3 to shard 1.
+The balancer will migrate a chunk from shard 1 to shard 3.
+
+8. Empty chunks
+Spin up a sharded cluster using ShardingTest and create a number of empty chunks. Then merge a chunk range or two using the mergeChunks command. See the docs for more information on mergeChunks. You only need one shard for this exercise. You can use a pre-splitting algorithm of some kind to create the empty chunks. For example, to create chunks for documents in the myapp.users collection using the email field as the shard key, you can run the following operation in the mongo shell.
+
+for ( var x=97; x<97+26; x++ ) {
+    for( var y=97; y<97+26; y+=6 ) {
+        var prefix = String.fromCharCode(x) + String.fromCharCode(y);
+        db.runCommand( { split : "myapp.users", middle : { email : prefix } } );
+    }
+}
+Answer:
+First thing you'll need to do is spin up a cluster for this test. You can pick your number of shards & replica set configuration, but here's a simple example with 3-node replica sets:
+
+> cluster = new ShardingTest( { shards: 1, rs: { nodes: [ { } ] } } );
+Once that has spun up, connect to the mongos:
+
+$ mongo --port 30999
+then enable sharding on your database and shard your collection:
+
+mongos> sh.enableSharding("myapp")
+{ "ok" : 1 }
+mongos> sh.shardCollection( "myapp.users" , { "email" : 1 } )
+{ "collectionsharded" : "myapp.users", "ok" : 1 }
+mongos> 
+Now, we can look at our chunks and see that initially we have only one:
+
+mongos> use config
+switched to db config
+mongos> db.chunks.find()
+{ "_id" : "myapp.users-email_MinKey", "lastmod" : Timestamp(1, 0), "lastmodEpoch" : ObjectId("538e27be31972172d9b3ec61"), "ns" : "myapp.users", "min" : { "email" : { "$minKey" : 1 } }, "max" : { "email" : { "$maxKey" : 1 } }, "shard" : "test-rs0" }
+mongos>
+Great! So let's now break that apart with the script in the problem statement:
+
+mongos> use admin
+switched to db admin
+mongos> for ( var x=97; x<97+26; x++ ) {
+...     for( var y=97; y<97+26; y+=6 ) {
+...         var prefix = String.fromCharCode(x) + String.fromCharCode(y);
+...         db.runCommand( { split : "myapp.users", middle : { email : prefix } } );
+...     }
+... }
+{ "ok" : 1 }
+mongos>
+And now we can see that we've got lots of chunks:
+
+mongos> use config
+switched to db config
+mongos> db.chunks.find().count()
+131
+So now to merge a few of them. First, we'll want to verify that they're empty. Of course, we know that these are empty (since we haven't put any data in them), but in production, things might not be so obvious. I'll set some variables to make querying easy, then verify the size of data in it:
+
+mongos> first_doc = db.chunks.find().next()
+{
+	"_id" : "myapp.users-email_MinKey",
+	"lastmod" : Timestamp(2, 0),
+	"lastmodEpoch" : ObjectId("538e27be31972172d9b3ec61"),
+	"ns" : "myapp.users",
+	"min" : {
+		"email" : { "$minKey" : 1 }
+	},
+	"max" : {
+		"email" : "aa"
+	},
+	"shard" : "test-rs1"
+}
+mongos> min = first_doc.min
+{ "email" : { "$minKey" : 1 } }
+mongos> max = first_doc.max
+{ "email" : "aa" }
+mongos> keyPattern = { email : 1 }
+{ "email" : 1 }
+mongos> ns = first_doc.ns
+myapp.users
+mongos> db.runCommand({dataSize: ns, keyPattern: keyPattern, min: min, max: max } )
+{ "size" : 0, "numObjects" : 0, "millis" : 0, "ok" : 1 }
+So, that last line tells us that there are 0 documents in that first chunk. We could do this with any number of chunks, and of course the answer will be the same.
+
+OK, let's merge the first and second docs, first finding the shard key maximum on the second doc:
+
+mongos> second_doc = db.chunks.find().skip(1).next()
+{
+	"_id" : "myapp.users-email_\"aa\"",
+	"lastmod" : Timestamp(3, 0),
+	"lastmodEpoch" : ObjectId("538e27be31972172d9b3ec61"),
+	"ns" : "myapp.users",
+	"min" : {
+		"email" : "aa"
+	},
+	"max" : {
+		"email" : "ag"
+	},
+	"shard" : "test-rs0"
+}
+mongos> max2 = second_doc.max
+{ "email" : "ag" }
+mongos> use admin
+switched to db admin
+mongos> db.runCommand( { mergeChunks : ns , bounds : [ min , max2 ] } )
+{ "ok" : 1 }
+So there we've done it! Let's look at our chunk data:
+
+mongos> use config
+mongos> db.chunks.count()
+130
+mongos> db.chunks.find().limit(2)
+{ "_id" : "myapp.users-email_MinKey", "ns" : "myapp.users", "min" : { "email" : { "$minKey" : 1 } }, "max" : { "email" : "ag" }, "version" : Timestamp(1, 261), "versionEpoch" : ObjectId("538e2cc240ba884cdd64c109"), "lastmod" : Timestamp(1, 261), "lastmodEpoch" : ObjectId("538e2cc240ba884cdd64c109"), "shard" : "test-rs0" }
+{ "_id" : "myapp.users-email_\"ag\"", "lastmod" : Timestamp(1, 5), "lastmodEpoch" : ObjectId("538e2cc240ba884cdd64c109"), "ns" : "myapp.users", "min" : { "email" : "ag" }, "max" : { "email" : "am" }, "shard" : "test-rs0" }
+So we've eliminated a chunk (count went from 131 to 130), and we can see that the first chunk's range goes all the way from $minKey to 'ag'.
+
+9. Orphaned chunks
+Do orphaned chunks alter the data returned for queries with a Primary read preference?
+
+No, because they are filtered out by the chunk manager[T] - As the queries come from mongos
+No, because orphaned documents are marked by a field MongoDB automatically adds
+No, because they are automatically deleted
+Yes, because they will be retrieved for non-targeted (scatter/gather) queries
+Yes, because all documents matching a query are included in the result set    
+
+===============================================================================================================
+
+
+H-w 6-1:
+
+$ mongo --nodb
+> config = { d0 : { smallfiles : "", noprealloc : "", nopreallocj : ""}, d1 : { smallfiles : "", noprealloc : "", nopreallocj : "" }, d2 : { smallfiles : "", noprealloc : "", nopreallocj : ""}};
+> cluster = new ShardingTest( { shards : config } );
+
+➜  ~  mongo --port 30999
+MongoDB shell version: 2.6.1
+connecting to: 127.0.0.1:30999/test
+mongos> sh.status()
+--- Sharding Status --- 
+  sharding version: {
+	"_id" : 1,
+	"version" : 4,
+	"minCompatibleVersion" : 4,
+	"currentVersion" : 5,
+	"clusterId" : ObjectId("53944a6a8cbf59a309dffac0")
+}
+  shards:
+	{  "_id" : "shard0000",  "host" : "localhost:30000",  "tags" : [ "LTS" ] }
+	{  "_id" : "shard0001",  "host" : "localhost:30001",  "tags" : [ "STS" ] }
+	{  "_id" : "shard0002",  "host" : "localhost:30002",  "tags" : [ "LTS" ] }
+  databases:
+	{  "_id" : "admin",  "partitioned" : false,  "primary" : "config" }
+	{  "_id" : "testDB",  "partitioned" : true,  "primary" : "shard0001" }
+		testDB.testColl
+			shard key: { "createdDate" : 1 }
+			chunks:
+				shard0002	287
+				shard0000	79
+				shard0001	121
+			too many chunks to print, use verbose if you want to force print
+			 tag: LTS  { "createdDate" : ISODate("2013-01-01T00:00:00Z") } -->> { "createdDate" : ISODate("2014-01-01T00:00:00Z") }
+			 tag: STS  { "createdDate" : ISODate("2014-01-01T00:00:00Z") } -->> { "createdDate" : ISODate("2014-05-01T00:00:00Z") }
+
+mongos> sh.stopBalancer()
+Waiting for active hosts...
+Waiting for the balancer lock...
+Waiting again for active hosts after balancer is off...
+mongos> use config
+switched to db config
+mongos> db.tags.find()
+{ "_id" : { "ns" : "testDB.testColl", "min" : { "createdDate" : ISODate("2013-01-01T00:00:00Z") } }, "max" : { "createdDate" : ISODate("2014-01-01T00:00:00Z") }, "ns" : "testDB.testColl", "tag" : "LTS", "min" : { "createdDate" : ISODate("2013-01-01T00:00:00Z") } }
+{ "_id" : { "ns" : "testDB.testColl", "min" : { "createdDate" : ISODate("2014-01-01T00:00:00Z") } }, "max" : { "createdDate" : ISODate("2014-05-01T00:00:00Z") }, "ns" : "testDB.testColl", "tag" : "STS", "min" : { "createdDate" : ISODate("2014-01-01T00:00:00Z") } }
+
+db.tags.remove({ "_id" : { "ns" : "testDB.testColl", "min" : { "createdDate" : ISODate("2014-01-01T00:00:00Z") } }, "max" : { "createdDate" : ISODate("2014-05-01T00:00:00Z") }, "ns" : "testDB.testColl", "tag" : "STS", "min" : { "createdDate" : ISODate("2014-01-01T00:00:00Z") } })
+WriteResult({ "nRemoved" : 1 })
+mongos> sh.status()
+--- Sharding Status --- 
+  sharding version: {
+	"_id" : 1,
+	"version" : 4,
+	"minCompatibleVersion" : 4,
+	"currentVersion" : 5,
+	"clusterId" : ObjectId("53944a6a8cbf59a309dffac0")
+}
+  shards:
+	{  "_id" : "shard0000",  "host" : "localhost:30000",  "tags" : [ "LTS" ] }
+	{  "_id" : "shard0001",  "host" : "localhost:30001",  "tags" : [ "STS" ] }
+	{  "_id" : "shard0002",  "host" : "localhost:30002",  "tags" : [ "LTS" ] }
+  databases:
+	{  "_id" : "admin",  "partitioned" : false,  "primary" : "config" }
+	{  "_id" : "testDB",  "partitioned" : true,  "primary" : "shard0001" }
+		testDB.testColl
+			shard key: { "createdDate" : 1 }
+			chunks:
+				shard0002	237
+				shard0000	129
+				shard0001	121
+			too many chunks to print, use verbose if you want to force print
+					 tag: LTS  { "createdDate" : ISODate("2013-01-01T00:00:00Z") } -->> { "createdDate" : ISODate("2014-02-01T00:00:00Z") }
+			 tag: STS  { "createdDate" : ISODate("2014-02-01T00:00:00Z") } -->> { "createdDate" : ISODate("2014-05-01T00:00:00Z") }
+			 
+mongos> sh.startBalancer()
+mongos> sh.status()
+--- Sharding Status --- 
+  sharding version: {
+	"_id" : 1,
+	"version" : 4,
+	"minCompatibleVersion" : 4,
+	"currentVersion" : 5,
+	"clusterId" : ObjectId("53944a6a8cbf59a309dffac0")
+}
+  shards:
+	{  "_id" : "shard0000",  "host" : "localhost:30000",  "tags" : [ "LTS" ] }
+	{  "_id" : "shard0001",  "host" : "localhost:30001",  "tags" : [ "STS" ] }
+	{  "_id" : "shard0002",  "host" : "localhost:30002",  "tags" : [ "LTS" ] }
+  databases:
+	{  "_id" : "admin",  "partitioned" : false,  "primary" : "config" }
+	{  "_id" : "testDB",  "partitioned" : true,  "primary" : "shard0001" }
+		testDB.testColl
+			shard key: { "createdDate" : 1 }
+			chunks:
+				shard0002	234
+				shard0000	163
+				shard0001	90
+			too many chunks to print, use verbose if you want to force print
+			 tag: LTS  { "createdDate" : ISODate("2013-01-01T00:00:00Z") } -->> { "createdDate" : ISODate("2014-02-01T00:00:00Z") }
+			 tag: STS  { "createdDate" : ISODate("2014-02-01T00:00:00Z") } -->> { "createdDate" : ISODate("2014-05-01T00:00:00Z") }
+
+-> Done.
+
+===============================================================================================================			 	
+
+H-w 6.2:
+
+$ mongo --nodb
+> config = { d0 : { smallfiles : "", noprealloc : "", nopreallocj : ""}, d1 : { smallfiles : "", noprealloc : "", nopreallocj : "" } };
+> cluster = new ShardingTest( { shards: config } );
+
+> mongo --port 30000
+> mongo --port 30001
+> mongo --port 30999
+
+- on port 30000
+> db.setProfilingLevel(2)
+{ "was" : 0, "slowms" : 100, "ok" : 1 }
+> db.system.profile.find().sort({"ts":-1})
+
+{ "op" : "query", "ns" : "test.system.indexes", "query" : { "expireAfterSeconds" : { "$exists" : true } }, "ntoreturn" : 0, "ntoskip" : 0, "nscanned" : 0, "nscannedObjects" : 0, "keyUpdates" : 0, "numYield" : 0, "lockStats" : { "timeLockedMicros" : { "r" : NumberLong(374), "w" : NumberLong(0) }, "timeAcquiringMicros" : { "r" : NumberLong(6), "w" : NumberLong(6) } }, "nreturned" : 0, "responseLength" : 20, "millis" : 0, "execStats" : {  }, "ts" : ISODate("2014-06-08T17:31:10.917Z"), "client" : "0.0.0.0", "allUsers" : [ { "user" : "__system", "db" : "local" } ], "user" : "__system@local" }
+{ "op" : "query", "ns" : "test.system.profile", "query" : { "query" : {  }, "orderby" : { "ts" : -1 } }, "ntoreturn" : 0, "ntoskip" : 0, "nscanned" : 0, "nscannedObjects" : 0, "scanAndOrder" : true, "keyUpdates" : 0, "numYield" : 0, "lockStats" : { "timeLockedMicros" : { "r" : NumberLong(277), "w" : NumberLong(0) }, "timeAcquiringMicros" : { "r" : NumberLong(9), "w" : NumberLong(7) } }, "nreturned" : 0, "responseLength" : 20, "millis" : 0, "execStats" : { "type" : "SORT", "works" : 4, "yields" : 0, "unyields" : 0, "invalidates" : 0, "advanced" : 0, "needTime" : 2, "needFetch" : 0, "isEOF" : 1, "forcedFetches" : 0, "memUsage" : 0, "memLimit" : 33554432, "children" : [ { "type" : "COLLSCAN", "works" : 2, "yields" : 0, "unyields" : 0, "invalidates" : 0, "advanced" : 0, "needTime" : 1, "needFetch" : 0, "isEOF" : 1, "docsTested" : 0, "children" : [ ] } ] }, "ts" : ISODate("2014-06-08T17:31:07.809Z"), "client" : "127.0.0.1", "allUsers" : [ ], "user" : "" }
+
+mongos> sh.stopBalancer()
+mongos> use admin
+mongos> db.runCommand( { moveChunk : "week6.m202", bounds : [{"_id": ISODate("2014-07-16T00:00:00Z")},{"_id": ISODate("2014-07-17T00:00:00Z")}],"to":"shard0001"})
+{ "millis" : 413, "ok" : 1 }
+mongos> db.runCommand( { moveChunk : "week6.m202", bounds : [{"_id": ISODate("2014-07-15T00:00:00Z")},{"_id": ISODate("2014-07-16T00:00:00Z")}],"to":"shard0001"})
+{ "millis" : 441, "ok" : 1 }
+mongos> db.runCommand( { moveChunk : "week6.m202", bounds : [{"_id": ISODate("2014-07-18T00:00:00Z")},{"_id": ISODate("2014-07-19T00:00:00Z")}],"to":"shard0001"})
+{ "millis" : 559, "ok" : 1 }
+
+Done.
