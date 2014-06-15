@@ -1,0 +1,63 @@
+DATA INTEGRITY, AUTHENTICATION, AND SECURITY
+
+1. The way I've drawn the diagrams in this lesson, you might conclude that the response time for queries with write concern greater than 1 depends primarily on the number of nodes to which the data must be replicated before a response is sent back. Which of the following factors have an effect on response time for such queries?
+
+
+Network latency between members of the replica set [T]
+
+How the members of the replica set are chained together for replication [T]
+
+The number of nodes the write must be replicated to [T]
+
+The speed at which nodes are able to execute writes [T]
+
+2. Quiz: Taking actions based on the output of db.currentOp() The following script is dangerous. Why?
+killLongRunningOps = function(maxSecsRunning) {
+    currOp = db.currentOp();
+    for (oper in currOp.inprog) {
+        op = currOp.inprog[oper-0];
+        if (op.secs_running > maxSecsRunning) {
+            print("Killing opId: " + op.opid
+                    + " running over for secs: "
+                    + op.secs_running);
+            db.killOp(op.opid);
+        }
+    }
+};
+
+The script as presented in the quiz will kill all long running operations including, possibly, replication operations, connection operations, and others fundamental to MongoDB. Killing such operations can cause unpredictable behavior with your system. To see a safe version of this script, please see the GitHub gist for Adam's killLongRunningOps()[https://gist.github.com/comerford/9248866] script.
+
+3. Quiz: Log files are noisy
+Download and extract the handout if you haven't already. Using grep or some other method, determine the type of error encountered in the most recent socket exception. Enter the type of error (without the surrounding brackets) in the text field below. The error should be of the form XXXXXXX_ERROR.
+
+CONNECTION_ERROR
+
+4. Quiz: Native Auth in MongoDB 2.6
+In MongoDB 2.6, in which database are the user authorization and authentication data stored?
+
+In the database where the user logs in.
+In the admin database.[T]
+In the config database.
+In the users database.
+
+5. Quiz: Authentication in sharded clusters: Users
+In a mongodb 2.4 setup, you have a sharded cluster with 3 shards, 's1', 's2', and 's3', plus a mongos and 3 config servers. One database, 'testDB', has 's3' as its primary shard, and includes only one collection, 'testColl', which is sharded and therefore present on all shards. One user, "adam", is authorized to login only to the "testDB" database. On which servers can 'adam' connect and log in? Check all that apply.
+
+The config servers
+s1
+s2
+s3[T]
+the mongos[T]
+
+6. Quiz: Authentication in sharded clusters: Users
+In a mongodb 2.6 setup, you have a sharded cluster with 3 shards, 's1', 's2', and 's3', plus a mongos and 3 config servers.
+One database, 'testDB', has 's3' as its primary shard, and includes only one collection, 'testColl', which is sharded and therefore present on all shards. One user, "adam", is authorized to login only to the "testDB" database. On which servers can 'adam' connect and log in? Check all that apply.
+
+The config servers[T] - As all the users are moved to admin db and which is on config server in 2.6+
+s1
+s2
+s3
+The mongos[T]
+
+Note: mtolls for analysing the logs - check mtolls in github. 
+
