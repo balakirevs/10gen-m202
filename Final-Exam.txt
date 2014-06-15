@@ -1,0 +1,1051 @@
+Final: Question 1: User Privileges in MongoDB
+
+Spin up a server with --auth and create a user, "roland", who is a userAdminAnyDatabase and who logs in on the admin database with password "12345".
+
+Create user "vespa" who can log into the "testA" database and who has the roles of "read" and "dbAdmin" on database "testA" and "readWrite" on database "testB". Do not give "vespa" any other abilities beyond this on any database. You may use any password you like for vespa.
+
+Answer:
+
+mongod --port 271017
+mongo
+
+> db.createUser({ user: "siteUserAdmin", pwd: "password", roles: [{ role: "userAdminAnyDatabase", db: "admin" }]})
+
+Successfully added user: {
+	"user" : "siteUserAdmin",
+	"roles" : [
+		{
+			"role" : "userAdminAnyDatabase",
+			"db" : "admin"
+		}
+	]
+}
+> ^C
+bye
+
+Restart the mongod server
+
+mongod --auth
+
+mongo -u siteUserAdmin -p password --authenticationDatabase=admin
+MongoDB shell version: 2.6.1
+connecting to: test
+Error while trying to show server startup warnings: not authorized on admin to execute command { getLog: "startupWarnings" }
+ 
+> use admin
+switched to db admin
+ 
+> show users
+{
+	"_id" : "admin.siteUserAdmin",
+	"user" : "siteUserAdmin",
+	"db" : "admin",
+	"roles" : [
+		{
+			"role" : "userAdminAnyDatabase",
+			"db" : "admin"
+		}
+	]
+}
+
+> rs.status()
+{
+	"ok" : 0,
+	"errmsg" : "not authorized on admin to execute command { replSetGetStatus: 1.0 }",
+	"code" : 13
+}
+
+Listing the user permissions ->
+> db.runCommand({usersInfo:"siteUserAdmin", showPrivileges:true})
+{
+	"users" : [
+		{
+			"_id" : "admin.siteUserAdmin",
+			"user" : "siteUserAdmin",
+			"db" : "admin",
+			"roles" : [
+				{
+					"role" : "userAdminAnyDatabase",
+					"db" : "admin"
+				}
+			],
+			"inheritedRoles" : [
+				{
+					"role" : "userAdminAnyDatabase",
+					"db" : "admin"
+				}
+			],
+			"inheritedPrivileges" : [
+				{
+					"resource" : {
+						"db" : "",
+						"collection" : ""
+					},
+					"actions" : [
+						"changeCustomData",
+						"changePassword",
+						"createRole",
+						"createUser",
+						"dropRole",
+						"dropUser",
+						"grantRole",
+						"revokeRole",
+						"viewRole",
+						"viewUser"
+					]
+				},
+				{
+					"resource" : {
+						"cluster" : true
+					},
+					"actions" : [
+						"authSchemaUpgrade",
+						"invalidateUserCache",
+						"listDatabases"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "",
+						"collection" : "system.users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.roles"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.version"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.new_users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.backup_users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				}
+			]
+		}
+	],
+	"ok" : 1
+}
+
+Creation of required users ->
+
+> use admin
+switched to db admin
+> db.createUser({user:"roland", pwd: "12345", roles:[{role:"userAdminAnyDatabase", db:"admin"}]})
+
+Successfully added user: {
+	"user" : "roland",
+	"roles" : [
+		{
+			"role" : "userAdminAnyDatabase",
+			"db" : "admin"
+		}
+	]
+}
+
+> use testA
+switched to db testA
+> db.createUser({ user:"vespa", pwd: "12345", roles:[{ role: "read", db:"testA" },{ role: "dbAdmin", db: "testA" }, { role: "readWrite", db: "testB" }]})
+Successfully added user: {
+	"user" : "vespa",
+	"roles" : [
+		{
+			"role" : "read",
+			"db" : "testA"
+		},
+		{
+			"role" : "dbAdmin",
+			"db" : "testA"
+		},
+		{
+			"role" : "readWrite",
+			"db" : "testB"
+		}
+	]
+}
+
+> db.runCommand({usersInfo:"vespa", showPrivileges:true})
+{
+	"users" : [
+		{
+			"_id" : "testA.vespa",
+			"user" : "vespa",
+			"db" : "testA",
+			"roles" : [
+				{
+					"role" : "read",
+					"db" : "testA"
+				},
+				{
+					"role" : "dbAdmin",
+					"db" : "testA"
+				},
+				{
+					"role" : "readWrite",
+					"db" : "testB"
+				}
+			],
+			"inheritedRoles" : [
+				{
+					"role" : "dbAdmin",
+					"db" : "testA"
+				},
+				{
+					"role" : "readWrite",
+					"db" : "testB"
+				},
+				{
+					"role" : "read",
+					"db" : "testA"
+				}
+			],
+			"inheritedPrivileges" : [
+				{
+					"resource" : {
+						"db" : "testA",
+						"collection" : ""
+					},
+					"actions" : [
+						"collMod",
+						"collStats",
+						"compact",
+						"convertToCapped",
+						"createCollection",
+						"createIndex",
+						"dbHash",
+						"dbStats",
+						"dropCollection",
+						"dropDatabase",
+						"dropIndex",
+						"enableProfiler",
+						"find",
+						"indexStats",
+						"killCursors",
+						"planCacheIndexFilter",
+						"planCacheRead",
+						"planCacheWrite",
+						"reIndex",
+						"renameCollectionSameDB",
+						"repairDatabase",
+						"storageDetails",
+						"validate"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testA",
+						"collection" : "system.indexes"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testA",
+						"collection" : "system.js"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testA",
+						"collection" : "system.namespaces"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testA",
+						"collection" : "system.profile"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"dropCollection",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testB",
+						"collection" : ""
+					},
+					"actions" : [
+						"collStats",
+						"convertToCapped",
+						"createCollection",
+						"createIndex",
+						"dbHash",
+						"dbStats",
+						"dropCollection",
+						"dropIndex",
+						"emptycapped",
+						"find",
+						"insert",
+						"killCursors",
+						"planCacheRead",
+						"remove",
+						"renameCollectionSameDB",
+						"update"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testB",
+						"collection" : "system.indexes"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testB",
+						"collection" : "system.js"
+					},
+					"actions" : [
+						"collStats",
+						"convertToCapped",
+						"createCollection",
+						"createIndex",
+						"dbHash",
+						"dbStats",
+						"dropCollection",
+						"dropIndex",
+						"emptycapped",
+						"find",
+						"insert",
+						"killCursors",
+						"planCacheRead",
+						"remove",
+						"renameCollectionSameDB",
+						"update"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "testB",
+						"collection" : "system.namespaces"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				}
+			]
+		}
+	],
+	"ok" : 1
+}
+
+> use admin
+switched to db admin
+> db.runCommand({usersInfo:"roland", showPrivileges:true})
+{
+	"users" : [
+		{
+			"_id" : "admin.roland",
+			"user" : "roland",
+			"db" : "admin",
+			"roles" : [
+				{
+					"role" : "userAdminAnyDatabase",
+					"db" : "admin"
+				}
+			],
+			"inheritedRoles" : [
+				{
+					"role" : "userAdminAnyDatabase",
+					"db" : "admin"
+				}
+			],
+			"inheritedPrivileges" : [
+				{
+					"resource" : {
+						"db" : "",
+						"collection" : ""
+					},
+					"actions" : [
+						"changeCustomData",
+						"changePassword",
+						"createRole",
+						"createUser",
+						"dropRole",
+						"dropUser",
+						"grantRole",
+						"revokeRole",
+						"viewRole",
+						"viewUser"
+					]
+				},
+				{
+					"resource" : {
+						"cluster" : true
+					},
+					"actions" : [
+						"authSchemaUpgrade",
+						"invalidateUserCache",
+						"listDatabases"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "",
+						"collection" : "system.users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.roles"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.version"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.new_users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				},
+				{
+					"resource" : {
+						"db" : "admin",
+						"collection" : "system.backup_users"
+					},
+					"actions" : [
+						"collStats",
+						"dbHash",
+						"dbStats",
+						"find",
+						"killCursors",
+						"planCacheRead"
+					]
+				}
+			]
+		}
+	],
+	"ok" : 1
+}
+
+- use MongoProc
+
+===============================================================================================================
+
+Final: Question 2: Config Servers
+
+In this assignment, you will fix a problem that sometimes arises with config servers in a sharded cluster.
+
+Start by running:
+
+$ mongo --nodb
+> cluster = new ShardingTest( { shards: 1 , rs : { nodes : [ { } ] }, config : 3 } )
+Next, click the "Initialize" button in MongoProc. This will create the problem you will need to fix.
+
+You can see the issue if you try to split a chunk in the 'testDB.testColl' collection with:
+
+db.adminCommand( { split : "testDB.testColl", middle : { _id : 7 } } )
+This will fail. Your job is to track down the problem and solve it. When you think you've got it, test it with MongoProc and submit when finished.
+
+Hint: You will almost certainly need to spin up your own config server separately from the ShardingTest. Make sure you use all of the same parameters used by ShardingTest when starting config servers. You can see these parameters by typing
+
+ps ax | grep mongo
+in a Linux shell.
+
+Remove files from testconfig2 and copy files from testconfig1
+Run all the mongod instances again, grepped mongo in a shell
+
+use mongoproc
+
+==============================================================================================================
+
+Final: Question 3: Replica Set
+
+Suppose you have a 3 node replica set where 2 of the nodes are in a data center that goes down and stays down indefinitely. Your job is to bring your third server to a place where it can accept writes.
+
+For this problem, we'll only need a replica set.
+
+Start by running the following lines and waiting for each to complete.
+
+Note: You must wait for rst.startSet() to finish before executing rst.initiate(). You will know when it is finished when the log shows: "[rsStart] replSet can't get local.system.replset config from self or any seed (EMPTYCONFIG)".
+
+If you are seeing log messages appear you can still paste in each command.
+
+$ mongo --nodb
+> options = {
+    nodes: 3,
+    startPort: 27017,
+    nodeOptions: {
+        smallfiles: "",
+        noprealloc: "",
+        nopreallocj: ""
+    }
+};
+> rst = new ReplSetTest(options);
+> rst.startSet();
+> rst.initiate();
+Then click "Initialize" in MongoProc. This will tear down the servers on ports 27018 and 27019. Your job is to get the server on 27017 up, running, and able to receive writes.
+
+Please do not spin up a server on localhost:27018 or localhost:27019 or access anything in the directories where those servers pointed before they were shut down. We want to simulate a situation where a data center disappears and it is impossible to access anything there. Generally, we prefer to give you a setup where we can eliminate "wrong" ways of solving a problem, but that is difficult to do in this case.
+
+Answer:
+
+mongo --port 27017
+MongoDB shell version: 2.6.1
+connecting to: 127.0.0.1:27017/test
+
+testReplSet:SECONDARY> rs.status()
+{
+	"set" : "testReplSet",
+	"date" : ISODate("2014-06-15T15:42:36Z"),
+	"myState" : 2,
+	"members" : [
+		{
+			"_id" : 0,
+			"name" : "HP:27017",
+			"health" : 1,
+			"state" : 2,
+			"stateStr" : "SECONDARY",
+			"uptime" : 177,
+			"optime" : Timestamp(1402846901, 1),
+			"optimeDate" : ISODate("2014-06-15T15:41:41Z"),
+			"self" : true
+		},
+		{
+			"_id" : 1,
+			"name" : "HP:27018",
+			"health" : 0,
+			"state" : 8,
+			"stateStr" : "(not reachable/healthy)",
+			"uptime" : 0,
+			"optime" : Timestamp(0, 0),
+			"optimeDate" : ISODate("1970-01-01T00:00:00Z"),
+			"lastHeartbeat" : ISODate("2014-06-15T15:42:34Z"),
+			"lastHeartbeatRecv" : ISODate("2014-06-15T15:41:57Z"),
+			"pingMs" : 0
+		},
+		{
+			"_id" : 2,
+			"name" : "HP:27019",
+			"health" : 0,
+			"state" : 8,
+			"stateStr" : "(not reachable/healthy)",
+			"uptime" : 0,
+			"optime" : Timestamp(0, 0),
+			"optimeDate" : ISODate("1970-01-01T00:00:00Z"),
+			"lastHeartbeat" : ISODate("2014-06-15T15:42:34Z"),
+			"lastHeartbeatRecv" : ISODate("2014-06-15T15:41:57Z"),
+			"pingMs" : 0
+		}
+	],
+	"ok" : 1
+
+testReplSet:SECONDARY> rs.conf()
+{
+	"_id" : "testReplSet",
+	"version" : 1,
+	"members" : [
+		{
+			"_id" : 0,
+			"host" : "HP:27017"
+		},
+		{
+			"_id" : 1,
+			"host" : "HP:27018"
+		},
+		{
+			"_id" : 2,
+			"host" : "HP:27019"
+		}
+	]
+}
+testReplSet:SECONDARY> x = rs.conf()
+{
+	"_id" : "testReplSet",
+	"version" : 1,
+	"members" : [
+		{
+			"_id" : 0,
+			"host" : "HP:27017"
+		},
+		{
+			"_id" : 1,
+			"host" : "HP:27018"
+		},
+		{
+			"_id" : 2,
+			"host" : "HP:27019"
+		}
+	]
+}
+testReplSet:SECONDARY> x
+{
+	"_id" : "testReplSet",
+	"version" : 1,
+	"members" : [
+		{
+			"_id" : 0,
+			"host" : "HP:27017"
+		},
+		{
+			"_id" : 1,
+			"host" : "HP:27018"
+		},
+		{
+			"_id" : 2,
+			"host" : "HP:27019"
+		}
+	]
+}
+
+testReplSet:SECONDARY> x.members = [{"_id":0,"host" : "HP:27017"}]
+[ { "_id" : 0, "host" : "HP:27017" } ]
+testReplSet:SECONDARY> x
+{
+	"_id" : "testReplSet",
+	"version" : 1,
+	"members" : [
+		{
+			"_id" : 0,
+			"host" : "HP:27017"
+		}
+	]
+}
+
+
+testReplSet:SECONDARY> rs.reconfig(x)
+{
+	"ok" : 0,
+	"errmsg" : "replSetReconfig command must be sent to the current replica set primary."
+}
+testReplSet:SECONDARY> rs.reconfig(x, {force:true})
+{ "ok" : 1 }
+testReplSet:SECONDARY> rs.conf()
+{
+	"_id" : "testReplSet",
+	"version" : 75523,
+	"members" : [
+		{
+			"_id" : 0,
+			"host" : "HP:27017"
+		}
+	]
+}
+testReplSet:PRIMARY> 
+
+Done.
+
+==============================================================================================================
+
+Final: Question 4: Fixing a Bad Shard Key
+
+Suppose you have a sharded collection final_exam.m202 in a cluster with 3 shards. To set up the problem, first initialize a cluster with 3 single-server shards (not replica sets) in the mongo shell using ShardingTest:
+
+$ mongo --nodb
+> config = { d0 : { smallfiles : "", noprealloc : "", nopreallocj : ""}, d1 : { smallfiles : "", noprealloc : "", nopreallocj : "" }, d2 : { smallfiles : "", noprealloc : "", nopreallocj : ""}};
+> cluster = new ShardingTest( { shards : config } );
+Then click "Initialize" in MongoProc, which will verify that you have 3 shards and then insert test data into final_exam.m202.
+
+Unfortunately, even though your shard key {otherID: 1} has high cardinality, the data is not being distributed well among the shards. You have decided that a hashed shard key based on the _id field would be a better choice, and want to reconfigure the collection to use this new shard key. Once you have the cluster using the new shard key for final_exam.m202, test in MongoProc and turn in when correct.
+
+Answer:
+
+ mongo --port 30999
+MongoDB shell version: 2.6.1
+connecting to: 127.0.0.1:30999/test
+mongos> sh.status()
+--- Sharding Status --- 
+  sharding version: {
+	"_id" : 1,
+	"version" : 4,
+	"minCompatibleVersion" : 4,
+	"currentVersion" : 5,
+	"clusterId" : ObjectId("539dc10ba86a01d284354f4c")
+}
+  shards:
+	{  "_id" : "shard0000",  "host" : "localhost:30000" }
+	{  "_id" : "shard0001",  "host" : "localhost:30001" }
+	{  "_id" : "shard0002",  "host" : "localhost:30002" }
+  databases:
+	{  "_id" : "admin",  "partitioned" : false,  "primary" : "config" }
+	{  "_id" : "final_exam",  "partitioned" : true,  "primary" : "shard0001" }
+		final_exam.m202
+			shard key: { "otherID" : 1 }
+			chunks:
+				shard0000	1
+				shard0002	1
+				shard0001	1
+			{ "otherID" : { "$minKey" : 1 } } -->> { "otherID" : -1 } on : shard0000 Timestamp(2, 0) 
+			{ "otherID" : -1 } -->> { "otherID" : 999 } on : shard0002 Timestamp(3, 0) 
+			{ "otherID" : 999 } -->> { "otherID" : { "$maxKey" : 1 } } on : shard0001 Timestamp(3, 1) 
+
+mongos> show databases;
+admin       (empty)
+config      0.016GB
+final_exam  0.156GB
+mongos> use final_exam;
+switched to db final_exam
+mongos> show collections
+m202
+system.indexes
+mongos> db.system.indexes.find()
+{ "v" : 1, "key" : { "_id" : 1 }, "name" : "_id_", "ns" : "final_exam.m202" }
+{ "v" : 1, "key" : { "otherID" : 1 }, "name" : "otherID_1", "ns" : "final_exam.m202" }
+
+➜ mkdir dump
+➜ cd dump
+➜  dump  mongodump --collection m202 --db final_exam --port 30999
+connected to: 127.0.0.1:30999
+2014-06-15T17:57:06.890+0200 DATABASE: final_exam	 to 	dump/final_exam
+2014-06-15T17:57:06.891+0200 	final_exam.m202 to dump/final_exam/m202.bson
+2014-06-15T17:57:08.217+0200 		 200000 documents
+2014-06-15T17:57:08.217+0200 	Metadata for final_exam.m202 to dump/final_exam/m202.metadata.json
+➜  dump  ls
+dump
+
+mongos> show databases;
+admin       (empty)
+config      0.016GB
+final_exam  0.156GB
+mongos> use final_exam;
+switched to db final_exam
+mongos> show collections
+m202
+system.indexes
+mongos> db.system.indexes.find()
+{ "v" : 1, "key" : { "_id" : 1 }, "name" : "_id_", "ns" : "final_exam.m202" }
+{ "v" : 1, "key" : { "otherID" : 1 }, "name" : "otherID_1", "ns" : "final_exam.m202" }
+mongos> db
+final_exam
+mongos> db.m202.drop()
+true
+mongos> show collections
+system.indexes
+
+Restoring
+
+➜  dump  mongorestore --db final_exam --port 30999 dump/final_exam/
+connected to: 127.0.0.1:30999
+2014-06-15T18:00:15.657+0200 dump/final_exam/m202.bson
+2014-06-15T18:00:15.657+0200 	going into namespace [final_exam.m202]
+2014-06-15T18:00:20.442+0200 		Progress: 2608500/9400000	27%	(bytes)
+2014-06-15T18:00:27.858+0200 		Progress: 3388700/9400000	36%	(bytes)
+2014-06-15T18:00:35.286+0200 		Progress: 4168900/9400000	44%	(bytes)
+2014-06-15T18:00:42.586+0200 		Progress: 4949100/9400000	52%	(bytes)
+2014-06-15T18:00:49.951+0200 		Progress: 5734000/9400000	61%	(bytes)
+2014-06-15T18:00:57.334+0200 		Progress: 6514200/9400000	69%	(bytes)
+2014-06-15T18:01:04.622+0200 		Progress: 7294400/9400000	77%	(bytes)
+2014-06-15T18:01:12.018+0200 		Progress: 8074600/9400000	85%	(bytes)
+2014-06-15T18:01:19.354+0200 		Progress: 8854800/9400000	94%	(bytes)
+200000 objects found
+2014-06-15T18:01:19.417+0200 	Creating index: { key: { _id: 1 }, name: "_id_", ns: "final_exam.m202" }
+2014-06-15T18:01:44.356+0200 	Creating index: { key: { otherID: 1 }, name: "otherID_1", ns: "final_exam.m202" }
+
+it has created the index on _id and otherID, the collection isn't sharded yet:
+
+mongos> sh.status()
+--- Sharding Status --- 
+  sharding version: {
+	"_id" : 1,
+	"version" : 4,
+	"minCompatibleVersion" : 4,
+	"currentVersion" : 5,
+	"clusterId" : ObjectId("539dc10ba86a01d284354f4c")
+}
+  shards:
+	{  "_id" : "shard0000",  "host" : "localhost:30000" }
+	{  "_id" : "shard0001",  "host" : "localhost:30001" }
+	{  "_id" : "shard0002",  "host" : "localhost:30002" }
+  databases:
+	{  "_id" : "admin",  "partitioned" : false,  "primary" : "config" }
+	{  "_id" : "final_exam",  "partitioned" : true,  "primary" : "shard0001" }
+
+shard the collection with {_id: "hashed"}
+
+mongos> db.m202.findOne()
+{
+	"_id" : ObjectId("539dc11ee6fc8c69afb09d0a"),
+	"otherID" : 999,
+	"ts" : ISODate("2014-07-01T00:00:01.998Z")
+}
+
+mongos> sh.shardCollection( "final_exam.m202", { _id: "hashed" } )
+{
+	"proposedKey" : {
+		"_id" : "hashed"
+	},
+	"curIndexes" : [
+		{
+			"v" : 1,
+			"key" : {
+				"_id" : 1
+			},
+			"name" : "_id_",
+			"ns" : "final_exam.m202"
+		},
+		{
+			"v" : 1,
+			"key" : {
+				"otherID" : 1
+			},
+			"name" : "otherID_1",
+			"ns" : "final_exam.m202"
+		}
+	],
+	"ok" : 0,
+	"errmsg" : "please create an index that starts with the shard key before sharding."
+}
+
+create an index on "_id" field:
+
+mongos> db.m202.ensureIndex({"_id":1})
+{
+	"raw" : {
+		"localhost:30001" : {
+			"numIndexesBefore" : 2,
+			"note" : "all indexes already exist",
+			"ok" : 1
+		}
+	},
+	"ok" : 1
+}
+
+it has to be a hashed index:
+
+mongos> db.m202.ensureIndex({"_id":"hashed"})
+{
+	"raw" : {
+		"localhost:30001" : {
+			"createdCollectionAutomatically" : false,
+			"numIndexesBefore" : 2,
+			"numIndexesAfter" : 3,
+			"ok" : 1
+		}
+	},
+	"ok" : 1
+}
+
+mongos> sh.shardCollection( "final_exam.m202", { _id: "hashed" } )
+{ "collectionsharded" : "final_exam.m202", "ok" : 1 }
+
+mongos> sh.status()
+--- Sharding Status --- 
+  sharding version: {
+	"_id" : 1,
+	"version" : 4,
+	"minCompatibleVersion" : 4,
+	"currentVersion" : 5,
+	"clusterId" : ObjectId("539dc10ba86a01d284354f4c")
+}
+  shards:
+	{  "_id" : "shard0000",  "host" : "localhost:30000" }
+	{  "_id" : "shard0001",  "host" : "localhost:30001" }
+	{  "_id" : "shard0002",  "host" : "localhost:30002" }
+  databases:
+	{  "_id" : "admin",  "partitioned" : false,  "primary" : "config" }
+	{  "_id" : "final_exam",  "partitioned" : true,  "primary" : "shard0001" }
+		final_exam.m202
+			shard key: { "_id" : "hashed" }
+			chunks:
+				shard0001	1
+			{ "_id" : { "$minKey" : 1 } } -->> { "_id" : { "$maxKey" : 1 } } on : shard0001 Timestamp(1, 0) 
+
+
+Done with success.
+
+=============================================================================================================
+
+Final: Question 5: Failed replica set initiation
+
+Please examine the attached log files. In this scenario, a replica set is initiated on one server with rs.initiate(). Once it successfully initialized, a second member was spun up and added to the replica set with rs.add().
+
+Before it was successfully added, there was a connection problem. What was it?
+
+
+
+A network partition
+
+One of the members went down while the second member was being added to the set [T]
+  (DBClientCursor::init call() failed errors and these happen noramlly when we push a new rsconfig. 
+  The current PRIMARY will step down and drops all the connections and then start again.)
+
+The replica set names in the configs for the two members were different
+
+There were too many connections to one of the members
+
+The replica set config points to the wrong IP address
+
+=============================================================================================================
+
+Final: Question 6: Finding configuration errors in log files
+
+Download, extract, and examine the log files in the attachment. These are the log files for four servers that were (by the end of the logs) spun up into a single replica set.
+
+Initially, there was a problem with one or more server configuration options. In the log file(s), find the configuration setting that is initially causing the issue.
+
+Enter the field name (not the value) for the setting that is the source of the problem. Do not use numbers, quotation marks, or other punctuation in your answer. For example, if you thought the problem was "logAppend": true (which it definitely isn't), you would type:
+
+logAppend
+When you have your answer, please paste or type it into the box below, and submit. Unfortunately, case/capitalization matters here, so please enter the field name for the setting in question exactly how it appears in the logs.
+
+Answer:
+
+ net
+
+
+
+
+
+
+
+
+
